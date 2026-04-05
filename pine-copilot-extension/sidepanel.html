@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pine Copilot</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <h1>Pine Copilot</h1>
+
+    <section class="card">
+      <h2>API 設定</h2>
+      <label>API Key<input id="apiKey" type="password" placeholder="sk-..." /></label>
+      <label>Base URL<input id="baseUrl" type="text" value="https://api.openai.com/v1" /></label>
+      <label>Model<input id="model" type="text" value="gpt-4o-mini" /></label>
+      <button id="saveSettings">儲存設定</button>
+    </section>
+
+    <section class="card">
+      <h2>頁面上下文</h2>
+      <div class="row">
+        <button id="refreshContext">重新抓頁面</button>
+        <button id="readScript">讀腳本</button>
+      </div>
+      <pre id="contextBox"></pre>
+    </section>
+
+    <section class="card">
+      <h2>需求</h2>
+      <textarea id="request" rows="6" placeholder="例如：把目前腳本改成 strategy，加入 SMA 5/10/120 濾網與停損停利"></textarea>
+      <button id="generate">AI 生成 Pine</button>
+    </section>
+
+    <section class="card">
+      <h2>結果</h2>
+      <div class="row">
+        <button id="copyResult">複製</button>
+        <button id="writeBack">寫回編輯器</button>
+      </div>
+      <pre id="resultBox"></pre>
+      <div id="metaBox" class="meta"></div>
+    </section>
+
+    <div id="status"></div>
+  </div>
+  <script src="sidepanel.js"></script>
+</body>
+</html>
