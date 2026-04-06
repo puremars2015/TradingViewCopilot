@@ -74,15 +74,19 @@ async function generatePine({ apiKey, baseUrl, model, userRequest, pageContext, 
   const raw = data?.choices?.[0]?.message?.content;
   if (!raw) throw new Error('模型沒有回傳內容');
 
+  // 先剝掉 markdown code fence（```json ... ``` 或 ``` ... ```）
+  const stripped = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+
   try {
-    return JSON.parse(raw);
+    return JSON.parse(stripped);
   } catch {
-    const codeMatch = raw.match(/```(?:pine|pinescript)?\s*([\s\S]*?)```/i);
+    // JSON 解析仍失敗，嘗試從內容中抓 pine code block
+    const codeMatch = stripped.match(/```(?:pine|pinescript)?\s*([\s\S]*?)```/i);
     return {
       title: 'Generated Pine Script',
-      pine_code: codeMatch ? codeMatch[1].trim() : raw,
-      explanation: '模型回傳的內容不是 JSON，已自動嘗試萃取程式碼。',
-      warnings: ['Response was not strict JSON.']
+      pine_code: codeMatch ? codeMatch[1].trim() : stripped,
+      explanation: '模型回傳的內容無法解析為 JSON，已自動嘗試萃取程式碼。',
+      warnings: ['Response was not valid JSON.']
     };
   }
 }

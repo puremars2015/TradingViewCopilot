@@ -38,12 +38,43 @@ function findRecentAlerts(text) {
   return jsonLike.slice(0, 10);
 }
 
-function getEditorEl() {
+// 取得 Monaco Editor instance（含有 Pine Script 內容的）
+function getMonacoEditor() {
+  try {
+    const editors = window.monaco?.editor?.getEditors?.() || [];
+    const pine = editors.find(e => {
+      const v = e.getModel()?.getValue() || '';
+      return /@version|indicator\(|strategy\(|library\(/i.test(v);
+    });
+    return pine || editors[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+// 取得 Monaco Editor 中符合 Pine Script 的 model
+function getMonacoModel() {
+  try {
+    const editor = getMonacoEditor();
+    if (editor) return editor.getModel();
+    // fallback：直接找 models
+    const models = window.monaco?.editor?.getModels?.() || [];
+    const pine = models.find(m => {
+      const v = m.getValue();
+      return /@version|indicator\(|strategy\(|library\(/i.test(v);
+    });
+    return pine || models[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+// textarea fallback（Monaco 不可用時）
+function getEditorTextarea() {
   const selectors = [
     'textarea[aria-label*="Editor content"]',
     'textarea[aria-label*="editor content"]',
-    'textarea.inputarea',
-    'textarea'
+    'textarea.inputarea'
   ];
   for (const sel of selectors) {
     const el = document.querySelector(sel);
@@ -53,19 +84,53 @@ function getEditorEl() {
 }
 
 function readPineEditor() {
-  const el = getEditorEl();
-  const titleEl = [...document.querySelectorAll('div,span,h1,h2')].find(node => /@version|indicator\(|strategy\(/i.test(node.textContent || ''));
+  // 優先使用 Monaco API
+  const model = getMonacoModel();
+  if (model) {
+    const code = model.getValue();
+    return {
+      found: true,
+      source: 'monaco',
+      title: document.title,
+      code
+    };
+  }
+
+  // Fallback：textarea
+  const el = getEditorTextarea();
   return {
     found: !!el,
+    source: 'textarea',
     title: document.title,
-    code: el ? el.value : '',
-    detectedFromPage: titleEl ? titleEl.textContent.slice(0, 200) : ''
+    code: el ? el.value : ''
   };
 }
 
 function writePineEditor(code) {
-  const el = getEditorEl();
-  if (!el) return { success: false, message: '找不到 Pine 編輯器 textarea' };
+  // 優先使用 Monaco editor instance 的 executeEdits（完整觸發 change 事件與 undo history）
+  const editor = getMonacoEditor();
+  if (editor) {
+    const model = editor.getModel();
+    const fullRange = model.getFullModelRange();
+    editor.executeEdits('pine-copilot', [{
+      range: fullRange,
+      text: code,
+      forceMoveMarkers: true
+    }]);
+    editor.focus();
+    return { success: true, message: '已透過 Monaco executeEdits 寫入 Pine 編輯器' };
+  }
+
+  // Fallback：model.setValue（monaco 有 model 但無 editor instance）
+  const model = getMonacoModel();
+  if (model) {
+    model.setValue(code);
+    return { success: true, message: '已透過 Monaco model.setValue 寫入（editor instance 不可用）' };
+  }
+
+  // Fallback：textarea
+  const el = getEditorTextarea();
+  if (!el) return { success: false, message: '找不到 Pine 編輯器（Monaco 與 textarea 都失敗）' };
 
   el.focus();
   const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
@@ -77,7 +142,7 @@ function writePineEditor(code) {
   el.dispatchEvent(new InputEvent('input', { bubbles: true, data: code, inputType: 'insertText' }));
   el.dispatchEvent(new Event('change', { bubbles: true }));
 
-  return { success: true, message: '已嘗試寫入 Pine 編輯器' };
+  return { success: true, message: '已透過 textarea fallback 寫入 Pine 編輯器' };
 }
 
 function getPageContext() {
@@ -90,7 +155,7 @@ function getPageContext() {
     activeTimeframes: findTimeframes(text),
     visibleIndicators: findIndicators(text),
     recentAlerts: findRecentAlerts(text),
-    hasPineEditor: !!getEditorEl()
+    hasPineEditor: !!(getMonacoModel() || getEditorTextarea())
   };
 }
 

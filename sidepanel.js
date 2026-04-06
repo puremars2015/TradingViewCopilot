@@ -23,8 +23,8 @@ async function sendMessage(type, payload) {
 async function loadSettings() {
   const result = await sendMessage('LOAD_SETTINGS');
   $('apiKey').value = result.apiKey || '';
-  $('baseUrl').value = result.baseUrl || 'https://api.openai.com/v1';
-  $('model').value = result.model || 'gpt-4o-mini';
+  $('baseUrl').value = result.baseUrl || 'https://openrouter.ai/api/v1';
+  $('model').value = result.model || 'minimax/minimax-m2.7';
 }
 
 async function saveSettings() {
