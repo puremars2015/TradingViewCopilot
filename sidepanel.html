@@ -30,7 +30,10 @@
     <section class="card">
       <h2>需求</h2>
       <textarea id="request" rows="6" placeholder="例如：把目前腳本改成 strategy，加入 SMA 5/10/120 濾網與停損停利"></textarea>
-      <button id="generate">AI 生成 Pine</button>
+      <button id="generate">
+        <span id="generateText">AI 生成 Pine</span>
+        <span id="generateSpinner" class="spinner"></span>
+      </button>
     </section>
 
     <section class="card">

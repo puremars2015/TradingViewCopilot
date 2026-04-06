@@ -100,13 +100,96 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         break;
       }
       case 'READ_PINE_EDITOR': {
-        const result = await sendToContent('READ_PINE_EDITOR');
-        sendResponse({ ok: true, result });
+        const tab = await getActiveTab();
+        const injected = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: 'MAIN',
+          func: () => {
+            function findTVEditor() {
+              const widget = document.querySelector('.tv-script-widget');
+              if (!widget) return null;
+              const rk = Object.keys(widget).find(k => k.startsWith('__reactContainer'));
+              if (!rk) return null;
+              function walkFiber(fiber, depth) {
+                if (!fiber || depth > 300) return null;
+                try {
+                  let s = fiber.memoizedState;
+                  while (s) {
+                    const v = s.memoizedState;
+                    if (v?.current?._editor &&
+                        typeof v.current._editor.getModel === 'function' &&
+                        typeof v.current._editor.executeEdits === 'function') {
+                      return v.current._editor;
+                    }
+                    s = s.next;
+                  }
+                } catch {}
+                return walkFiber(fiber.child, depth + 1) || walkFiber(fiber.sibling, depth + 1);
+              }
+              return walkFiber(widget[rk], 0);
+            }
+
+            const editor = findTVEditor();
+            if (!editor) return { found: false, source: 'none', code: '' };
+            try {
+              const code = editor.getModel().getValue();
+              return { found: true, source: 'react-fiber._editor', code };
+            } catch (e) {
+              return { found: false, source: 'error', code: '', error: e.message };
+            }
+          }
+        });
+        sendResponse({ ok: true, result: injected[0]?.result ?? { found: false, source: 'inject-error', code: '' } });
         break;
       }
       case 'WRITE_PINE_EDITOR': {
-        const result = await sendToContent('WRITE_PINE_EDITOR', { code: message.code });
-        sendResponse({ ok: true, result });
+        const tab = await getActiveTab();
+        const injected = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: 'MAIN',
+          func: (code) => {
+            function findTVEditor() {
+              const widget = document.querySelector('.tv-script-widget');
+              if (!widget) return null;
+              const rk = Object.keys(widget).find(k => k.startsWith('__reactContainer'));
+              if (!rk) return null;
+              function walkFiber(fiber, depth) {
+                if (!fiber || depth > 300) return null;
+                try {
+                  let s = fiber.memoizedState;
+                  while (s) {
+                    const v = s.memoizedState;
+                    if (v?.current?._editor &&
+                        typeof v.current._editor.getModel === 'function' &&
+                        typeof v.current._editor.executeEdits === 'function') {
+                      return v.current._editor;
+                    }
+                    s = s.next;
+                  }
+                } catch {}
+                return walkFiber(fiber.child, depth + 1) || walkFiber(fiber.sibling, depth + 1);
+              }
+              return walkFiber(widget[rk], 0);
+            }
+
+            const editor = findTVEditor();
+            if (!editor) return { success: false, message: '找不到 TradingView Pine Editor（react-fiber 掃描失敗）' };
+            try {
+              const model = editor.getModel();
+              editor.executeEdits('pine-copilot', [{
+                range: model.getFullModelRange(),
+                text: code,
+                forceMoveMarkers: true
+              }]);
+              try { editor.focus(); } catch {}
+              return { success: true, message: '已透過 react-fiber._editor.executeEdits 寫入' };
+            } catch (e) {
+              return { success: false, message: `寫入失敗: ${e.message}` };
+            }
+          },
+          args: [message.code]
+        });
+        sendResponse({ ok: true, result: injected[0]?.result ?? { success: false, message: '腳本注入失敗' } });
         break;
       }
       case 'GENERATE_PINE': {

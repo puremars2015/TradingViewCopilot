@@ -49,32 +49,44 @@ async function readScript() {
   setStatus(currentScript.found ? '已抓到 Pine 腳本' : '目前頁面找不到 Pine 編輯器', !currentScript.found);
 }
 
+function setGenerating(loading) {
+  $('generate').disabled = loading;
+  $('generateText').textContent = loading ? '生成中...' : 'AI 生成 Pine';
+  $('generateSpinner').classList.toggle('active', loading);
+}
+
 async function generate() {
   const apiKey = $('apiKey').value.trim();
   const baseUrl = $('baseUrl').value.trim();
   const model = $('model').value.trim();
   const userRequest = $('request').value.trim();
 
-  if (!pageContext) await refreshContext();
-  if (!currentScript) await readScript();
+  setGenerating(true);
+  setStatus('正在呼叫 AI，請稍候...');
+  try {
+    if (!pageContext) await refreshContext();
+    if (!currentScript) await readScript();
 
-  const result = await sendMessage('GENERATE_PINE', {
-    apiKey,
-    baseUrl,
-    model,
-    userRequest,
-    pageContext,
-    currentScript: currentScript?.code || ''
-  });
+    const result = await sendMessage('GENERATE_PINE', {
+      apiKey,
+      baseUrl,
+      model,
+      userRequest,
+      pageContext,
+      currentScript: currentScript?.code || ''
+    });
 
-  generatedCode = result.pine_code || '';
-  $('resultBox').textContent = generatedCode;
-  $('metaBox').innerHTML = `
-    <div><strong>${result.title || 'Generated Pine Script'}</strong></div>
-    <div>${(result.explanation || '').replace(/</g, '&lt;')}</div>
-    <div>${Array.isArray(result.warnings) ? result.warnings.join('<br>') : ''}</div>
-  `;
-  setStatus('AI 已完成生成');
+    generatedCode = result.pine_code || '';
+    $('resultBox').textContent = generatedCode;
+    $('metaBox').innerHTML = `
+      <div><strong>${result.title || 'Generated Pine Script'}</strong></div>
+      <div>${(result.explanation || '').replace(/</g, '&lt;')}</div>
+      <div>${Array.isArray(result.warnings) ? result.warnings.join('<br>') : ''}</div>
+    `;
+    setStatus('AI 已完成生成');
+  } finally {
+    setGenerating(false);
+  }
 }
 
 async function copyResult() {
